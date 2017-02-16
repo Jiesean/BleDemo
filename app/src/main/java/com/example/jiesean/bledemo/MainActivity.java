@@ -20,63 +20,64 @@ import android.os.Build;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
- * This program is designed for reading ANCS test.
+ * 将ble center的代码尽可能的简化，并在代码中提供尽可能详尽的注释
+ * 使得没有做过相关开发的人一下就看懂，并能实现简单的应用
  *
  */
 public class MainActivity extends AppCompatActivity {
 
     private String Tag = "MainActivity";
+
     private BluetoothManager mBluetoothManager;
     private BluetoothAdapter mBluetoothAdapter;
     private BluetoothLeScanner mBluetoothLeScanner;
+    private List<BluetoothGattService> mServiceList;
     private ScanCallback mScanCallback;
 
-    private BluetoothDevice mBondDevice;
-
-    private BluetoothGattService ancs;
-
-
-
-    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        IntentFilter intentFilter=new IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
-        BondReceiver mBondReceiver = new BondReceiver();
-        this.registerReceiver(mBondReceiver, intentFilter);
-
         mScanCallback = new LeScanCallback();
 
-        boolean bluetoothState = initBluetoothAdapter();
-
-//        if (bluetoothState == true) {
-//            startScanLeDevices();
-//        }
-
-
+        initBluetooth();
     }
 
     /**
-     * init bluetooth
+     * enable bluetooth
      */
-    private boolean initBluetoothAdapter() {
+    private void initBluetooth() {
+        //get Bluetooth service
         mBluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+        //get Bluetooth Adapter
         mBluetoothAdapter = mBluetoothManager.getAdapter();
-        if (mBluetoothAdapter != null && !mBluetoothAdapter.isEnabled()) {
-            Log.d(Tag, "BluetoothAdapter is null");
-            mBluetoothAdapter.enable();
+        if (mBluetoothAdapter == null) {//platform not support bluetooth
+            Log.d(Tag, "Bluetooth is not support");
         }
-//        if (mBluetoothAdapter == null || !mBluetoothAdapter.isEnabled()) {
-////            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-////            startActivityForResult(enableBtIntent, 1);
-//
-//        }
-        return true;
+        else{
+            int status = mBluetoothAdapter.getState();
+            //bluetooth is disabled
+            if (status == BluetoothAdapter.STATE_OFF) {
+                // enable bluetooth
+                mBluetoothAdapter.enable();
+            }
+        }
+    }
+
+    //*********** onclick处理函数 *************
+    public void onClickEvent(View view){
+        switch (view.getId()){
+            case R.id.startScanBtn:
+                startScanLeDevices();
+                break;
+        }
+
     }
 
     /**
@@ -84,41 +85,75 @@ public class MainActivity extends AppCompatActivity {
      */
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     private void startScanLeDevices() {
+
+        //Android 4.3以上，Android 5.0以下
+        //mBluetoothAdapter.startLeScan()
+
+        //Android 5.0以上，扫描的结果在mScanCallback中进行处理
         mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
         mBluetoothLeScanner.startScan(mScanCallback);
-       // mBluetoothAdapter.startLeScan(mLeScanCallback);
+
     }
+    //*********** onclick处理函数 *************
 
 
-    private BluetoothAdapter.LeScanCallback mLeScanCallback = new BluetoothAdapter.LeScanCallback(){
-        @TargetApi(Build.VERSION_CODES.KITKAT)
+    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+    private class LeScanCallback  extends ScanCallback{
+
+        /**
+         * 扫描结果的回调，每次扫描到一个设备，就调用一次。
+         * @param callbackType
+         * @param result
+         */
         @Override
-        public void onLeScan(BluetoothDevice bluetoothDevice, int i, byte[] bytes) {
-            if (bluetoothDevice != null) {
-                mBondDevice = bluetoothDevice;
-                boolean isBond = bluetoothDevice.createBond();
+        public void onScanResult(int callbackType, ScanResult result) {
+            //Log.d(Tag, "onScanResult");
+            if(result != null){
+                System.out.println("扫面到设备：" + result.getDevice().getName() + "  " + result.getDevice().getAddress());
+
+                //此处，我们尝试连接Heart Rate 设备
+                if (result.getDevice().getName() != null && ("MI").equals(result.getDevice().getName())) {
+                    //扫描到我们想要的设备后，立即停止扫描
+                    result.getDevice().connectGatt(MainActivity.this, false, mGattCallback);
+                    mBluetoothLeScanner.stopScan(mScanCallback);
+                }
             }
         }
-    };
+     }
 
     private BluetoothGattCallback mGattCallback = new BluetoothGattCallback() {
+
+        /**
+         * Callback indicating when GATT client has connected/disconnected to/from a remote GATT server
+         *
+         * @param gatt 返回连接建立的gatt对象
+         * @param status 返回的是此次gatt操作的结果，成功了返回0
+         * @param newState 每次client连接或断开连接状态变化，STATE_CONNECTED 0，STATE_CONNECTING 1,STATE_DISCONNECTED 2,STATE_DISCONNECTING 3
+         */
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
-            if (gatt != null) {
-                boolean isDiscovering = gatt.discoverServices();
+            Log.d(Tag, "onConnectionStateChange status:" + status + "  newState:" + newState);
+            if (status == 0) {
+                gatt.discoverServices();
             }
         }
 
         @Override
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             Log.d(Tag, "onServicesDiscovered");
-            ancs = gatt.getService(UUID.fromString("7905F431-B5CE-4E99-A40F-4B1E122D00D0"));
-            if (ancs != null) {
-                BluetoothGattCharacteristic notificationSourceChar = ancs.getCharacteristic(UUID.fromString("9FBF120D-6301-42D9-8C58-25E699A21DBD"));
-                gatt.setCharacteristicNotification(notificationSourceChar, true);
-                BluetoothGattDescriptor config = notificationSourceChar.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"));
-                config.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
-                gatt.writeDescriptor(config);
+            mServiceList = gatt.getServices();
+            if (mServiceList != null) {
+                System.out.println(mServiceList);
+                System.out.println("Services num:" + mServiceList.size());
+            }
+
+            for (BluetoothGattService service : mServiceList){
+                List<BluetoothGattCharacteristic> characteristics = service.getCharacteristics();
+                System.out.println("扫描到Service：" + service.getUuid());
+
+                for (BluetoothGattCharacteristic characteristic : characteristics) {
+                    System.out.println("characteristic: " + characteristic.getUuid() + "他的value：" + characteristic.getValue());
+                }
             }
         }
 
@@ -132,20 +167,4 @@ public class MainActivity extends AppCompatActivity {
             Log.d(Tag, "onDescriptorWrite");
         }
     };
-
-    public class BondReceiver extends BroadcastReceiver {
-
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            mBondDevice.connectGatt(getBaseContext(), false, mGattCallback);
-        }
-    }
-
-    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-    private class LeScanCallback  extends ScanCallback{
-        @Override
-        public void onScanResult(int callbackType, ScanResult result) {
-            Log.d(Tag, "onScanResult");
-        }
-    }
 }
