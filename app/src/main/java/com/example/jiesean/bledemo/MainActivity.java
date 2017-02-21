@@ -25,14 +25,13 @@ import android.view.View;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * 将ble center的代码尽可能的简化，并在代码中提供尽可能详尽的注释
- * 使得没有做过相关开发的人一下就看懂，并能实现简单的应用
- *
- */
+
 public class MainActivity extends AppCompatActivity {
 
     private String Tag = "MainActivity";
+
+    //目标设备的名称，可根据自己目标设备的不同去修改该名称来完成连接
+    private String mTargetDeviceName = "MI";
 
     private BluetoothManager mBluetoothManager;
     private BluetoothAdapter mBluetoothAdapter;
@@ -70,21 +69,11 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    //*********** onclick处理函数 *************
-    public void onClickEvent(View view){
-        switch (view.getId()){
-            case R.id.startScanBtn:
-                startScanLeDevices();
-                break;
-        }
-
-    }
-
     /**
-     * start Ble scan
+     * start Ble scan，扫描按钮的处理函数
      */
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-    private void startScanLeDevices() {
+    public void startScanLeDevices(View view) {
 
         //Android 4.3以上，Android 5.0以下
         //mBluetoothAdapter.startLeScan()
@@ -94,9 +83,10 @@ public class MainActivity extends AppCompatActivity {
         mBluetoothLeScanner.startScan(mScanCallback);
 
     }
-    //*********** onclick处理函数 *************
 
-
+    /**
+     * LE设备扫描结果返回
+     */
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     private class LeScanCallback  extends ScanCallback{
 
@@ -111,8 +101,8 @@ public class MainActivity extends AppCompatActivity {
             if(result != null){
                 System.out.println("扫面到设备：" + result.getDevice().getName() + "  " + result.getDevice().getAddress());
 
-                //此处，我们尝试连接Heart Rate 设备
-                if (result.getDevice().getName() != null && ("MI").equals(result.getDevice().getName())) {
+                //此处，我们尝试连接MI 设备
+                if (result.getDevice().getName() != null && mTargetDeviceName.equals(result.getDevice().getName())) {
                     //扫描到我们想要的设备后，立即停止扫描
                     result.getDevice().connectGatt(MainActivity.this, false, mGattCallback);
                     mBluetoothLeScanner.stopScan(mScanCallback);
@@ -121,6 +111,9 @@ public class MainActivity extends AppCompatActivity {
         }
      }
 
+    /**
+     * gatt连接结果的返回
+     */
     private BluetoothGattCallback mGattCallback = new BluetoothGattCallback() {
 
         /**
@@ -138,9 +131,15 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
+        /**
+         * Callback invoked when the list of remote services, characteristics and descriptors for the remote device have been updated, ie new services have been discovered.
+         *
+         * @param gatt 返回的是本次连接的gatt对象
+         * @param status
+         */
         @Override
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
-            Log.d(Tag, "onServicesDiscovered");
+            Log.d(Tag, "onServicesDiscovered status" + status);
             mServiceList = gatt.getServices();
             if (mServiceList != null) {
                 System.out.println(mServiceList);
@@ -157,14 +156,52 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
+        /**
+         * Callback triggered as a result of a remote characteristic notification.
+         *
+         * @param gatt
+         * @param characteristic
+         */
         @Override
         public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
             Log.d(Tag, "onCharacteristicChanged");
         }
 
+        /**
+         * Callback indicating the result of a characteristic write operation.
+         *
+         * @param gatt
+         * @param characteristic
+         * @param status
+         */
+        @Override
+        public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+            Log.d(Tag, "onCharacteristicWrite");
+        }
+
+        /**
+         *Callback reporting the result of a characteristic read operation.
+         *
+         * @param gatt
+         * @param characteristic
+         * @param status
+         */
+        @Override
+        public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+            Log.d(Tag, "onCharacteristicRead");
+        }
+
+        /**
+         * Callback indicating the result of a descriptor write operation.
+         *
+         * @param gatt
+         * @param descriptor
+         * @param status
+         */
         @Override
         public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
             Log.d(Tag, "onDescriptorWrite");
         }
+
     };
 }
