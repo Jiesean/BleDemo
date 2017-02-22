@@ -74,9 +74,8 @@ public class MainActivity extends AppCompatActivity {
      */
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     public void startScanLeDevices(View view) {
-
         //Android 4.3以上，Android 5.0以下
-        //mBluetoothAdapter.startLeScan()
+        //mBluetoothAdapter.startLeScan(BluetoothAdapter.LeScanCallback)
 
         //Android 5.0以上，扫描的结果在mScanCallback中进行处理
         mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
@@ -151,7 +150,7 @@ public class MainActivity extends AppCompatActivity {
                 System.out.println("扫描到Service：" + service.getUuid());
 
                 for (BluetoothGattCharacteristic characteristic : characteristics) {
-                    System.out.println("characteristic: " + characteristic.getUuid() + "他的value：" + characteristic.getValue());
+                    System.out.println("characteristic: " + characteristic.getUuid() );
                 }
             }
         }
